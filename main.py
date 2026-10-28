@@ -17,46 +17,44 @@ cols, rows = 110, 70
 
 
 def generate_ascii():
+    def generate_ascii():
+  # Создаем скользящие позиции для симуляции падающего кода "Матрицы"
+  offset = 0
+
   while True:
-    ret, frame = cap.read()
-    if not ret:
-      # Создаем искусственный кадр (шум) размером 480x640
-      frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
-      # Добавим надпись на сервере, чтобы было понятно, что это тест
-      cv2.putText(
-          frame,
-          "SERVER MODE (NO CAM)",
-          (50, 240),
-          cv2.FONT_HERSHEY_SIMPLEX,
-          1,
-          (255, 255, 255),
-          2,
-      )
-    # 1. Ваша логика: серое изображение и уменьшение размера
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    small = cv2.resize(gray, (cols, rows))
+    # 1. Создаем искусственный холст (кадр) полностью средствами NumPy
+    frame = np.zeros((rows, cols), dtype=np.uint8)
 
-    # 2. Переводим пиксели в ASCII-символы
-    # Нормализуем значения от 0 до (num_chars - 1)
-    animated_indices = (small / 255.0 * (num_chars - 1)).astype(int)
+    # 2. Генерируем вертикальные полосы, сдвигая их по фазе каждую итерацию
+    for c in range(cols):
+      speed_factor = (c % 5) + 1
+      for r in range(rows):
+        # Математическая формула для динамического волнового эффекта
+        val = int(
+            (np.sin((r + offset * speed_factor) * 0.3) + 1)
+            * 0.5
+            * (num_chars - 1)
+        )
+        frame[r, c] = val
 
+    # 3. Собираем символы на основе сгенерированной NumPy матрицы
     ascii_lines = []
-    for row in animated_indices:
-      # Собираем строку из символов по индексам яркости
+    for row in frame:
       line = "".join([ASCII_CHARS[pixel] for pixel in row])
       ascii_lines.append(line)
 
-    # Объединяем строки через символ переноса строки
     ascii_frame = "\n".join(ascii_lines)
-
-    # Заменяем реальные переносы на экранированные '\\n', чтобы SSE не ломал строку
     safe_frame = ascii_frame.replace("\n", "\\n")
 
-    # Отправляем текстовый кадр в веб по протоколу Server-Sent Events (SSE)
+    # Сдвигаем анимацию вперед
+    offset += 1
+
+    # Отправляем в веб-интерфейс
     yield f"data: {safe_frame}\n\n"
 
-    # Небольшая задержка, чтобы не перегружать процессор (~30 FPS)
-    time.sleep(0.03)
+    # Пауза между фреймами (примерно 25 кадров в секунду)
+    time.sleep(0.04)
+
 
 
 @app.route("/")
