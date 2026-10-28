@@ -20,9 +20,18 @@ def generate_ascii():
   while True:
     ret, frame = cap.read()
     if not ret:
-      # Создаем случайную матрицу (шум), имитирующую кадр
+      # Создаем искусственный кадр (шум) размером 480x640
       frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
-
+      # Добавим надпись на сервере, чтобы было понятно, что это тест
+      cv2.putText(
+          frame,
+          "SERVER MODE (NO CAM)",
+          (50, 240),
+          cv2.FONT_HERSHEY_SIMPLEX,
+          1,
+          (255, 255, 255),
+          2,
+      )
     # 1. Ваша логика: серое изображение и уменьшение размера
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     small = cv2.resize(gray, (cols, rows))
