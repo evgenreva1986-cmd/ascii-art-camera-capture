@@ -5,24 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test</title>
     <style>
-        body { background-color: #000; color: #0f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        /* Тег <pre> сохраняет все пробелы и переносы строк из Python */
+        body { background-color: #000; color: red; font-family: monospace; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        /* Тег <pre> сохраняет все пробелы и переносы строк */
         pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>Test translation</h1>
     <pre id="ascii-stream">Загрузка ASCII потока...</pre>
+    
+    <!-- Добавили тег span для вывода кода цвета -->
+    <div>
+        <input type="color" id="colors" value="#ff0000">
+        <span id="colorValue">#ff0000</span>
+    </div>
 
     <script>
         const asciiBox = document.getElementById('ascii-stream');
         // Подключаемся к текстовому потоку Flask
         const eventSource = new EventSource('/ascii_feed');
         
-        eventSource.onmessage = function(event) {
+        eventSource.onmessage = function(event) 
+        {
             // Декодируем переносы строк и обновляем экран
             asciiBox.textContent = event.data.replaceAll('\\n', '\n');
-        };
+        }; // Закрыли функцию onmessage
+
+        // Вынесли работу с цветом наружу, чтобы не вешать событие заново при каждом сообщении
+        const colorInput = document.getElementById('colors'); // Исправили id на 'colors'
+        const colorValue = document.getElementById('colorValue');
+
+        colorInput.addEventListener('input', (event) => 
+        {
+            const chosenColor = event.target.value;
+            colorValue.textContent = chosenColor;
+            
+            document.body.style.color = chosenColor;
+        }); // ТУТ была главная синтаксическая ошибка (не хватало });)
     </script>
 </body>
 </html>
