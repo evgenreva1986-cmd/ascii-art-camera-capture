@@ -17,7 +17,6 @@ cols, rows = 110, 70
 
 
 def generate_ascii():
-    def generate_ascii():
   # Создаем скользящие позиции для симуляции падающего кода "Матрицы"
   offset = 0
 
