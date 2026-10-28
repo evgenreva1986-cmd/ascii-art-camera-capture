@@ -1,58 +1,63 @@
+import time
 import cv2
+from flask import Flask, Response, render_template
 import numpy as np
 
-# Символы от темного к светлому (инвертировано для черного фона окна)
-# Обратите внимание: стандартный шрифт OpenCV (FONT_HERSHEY_SIMPLEX) не умеет рисовать иероглифы (漢字),
-# вместо них могут отображаться знаки вопроса, но код от этого не сломается.
-ASCII_CHARS = " ./:-=+*#%@'0)`~漢字"
+app = Flask(__name__)
+
+# Символы от темного к светлому 
+ASCII_CHARS = " .,:;i-+*h%@#W漢字"
+num_chars = len(ASCII_CHARS)
 
 cap = cv2.VideoCapture(0)
 
-while True:
+# Размеры сетки (как у вас в коде)
+cols, rows = 110, 70
+
+
+def generate_ascii():
+  while True:
     ret, frame = cap.read()
     if not ret:
-        break
+      break
 
+    # 1. Ваша логика: серое изображение и уменьшение размера
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    
-    # Уменьшаем разрешение под размер текстовой сетки
-    cols, rows = 110, 70
     small = cv2.resize(gray, (cols, rows))
 
-    # Создаем черный холст, на котором будем рисовать текст
-    canvas = np.zeros((750, 900, 3), dtype=np.uint8)
+    # 2. Переводим пиксели в ASCII-символы
+    # Нормализуем значения от 0 до (num_chars - 1)
+    animated_indices = (small / 255.0 * (num_chars - 1)).astype(int)
 
-    # Вычисляем шаг сетки для символов
-    x_step = 900 // cols
-    y_step = 750 // rows
+    ascii_lines = []
+    for row in animated_indices:
+      # Собираем строку из символов по индексам яркости
+      line = "".join([ASCII_CHARS[pixel] for pixel in row])
+      ascii_lines.append(line)
 
-    # Рисуем символы на холсте
-    for y in range(rows):
-        for x in range(cols):
-            pixel = small[y, x]
-            char_index = int(pixel / 256 * len(ASCII_CHARS))
-            char = ASCII_CHARS[char_index]
-            
-            # Координаты для текущего символа
-            pos_x = x * x_step
-            pos_y = y * y_step + 10 # +10 смещение по вертикали
-            
-            # Рисуем зеленый символ (как в Матрице)
-            cv2.putText(canvas, char, (pos_x, pos_y), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 1)
+    # Объединяем строки через символ переноса строки
+    ascii_frame = "\n".join(ascii_lines)
 
-    # ПОКАЗЫВАЕМ КАДР (Оставили только одну строчку imshow)
-    cv2.imshow('Matrix Camera', canvas)
+    # Заменяем реальные переносы на экранированные '\\n', чтобы SSE не ломал строку
+    safe_frame = ascii_frame.replace("\n", "\\n")
 
-    # Ждем 30 мс и проверяем нажатие клавиши (q или Esc)
-    key = cv2.waitKey(30) & 0xFF
-    if key == ord('q') or key == 27:
-        break
+    # Отправляем текстовый кадр в веб по протоколу Server-Sent Events (SSE)
+    yield f"data: {safe_frame}\n\n"
 
-    # МАГИЯ ДЛЯ КРЕСТИКА: Проверяем закрытие окна мышкой.
-    # Имя окна 'Matrix Camera' строго совпадает с именем в cv2.imshow выше!
-    if cv2.getWindowProperty('Matrix Camera', cv2.WND_PROP_VISIBLE) < 1:
-        break
+    # Небольшая задержка, чтобы не перегружать процессор (~30 FPS)
+    time.sleep(0.03)
 
-cap.release()
-cv2.destroyAllWindows()
+
+@app.route("/")
+def index():
+  return render_template("index.html")
+
+
+@app.route("/ascii_feed")
+def ascii_feed():
+  # Отдаем текст с миметпом event-stream
+  return Response(generate_ascii(), mimetype="text/event-stream")
+
+
+if __name__ == "__main__":
+  app.run(host="0.0.0.0", port=5000, debug=True)

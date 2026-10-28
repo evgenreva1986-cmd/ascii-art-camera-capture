@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test</title>
+    <style>
+        body { background-color: #000; color: #0f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        /* Тег <pre> сохраняет все пробелы и переносы строк из Python */
+        pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Test translation</h1>
+    <pre id="ascii-stream">Загрузка ASCII потока...</pre>
+
+    <script>
+        const asciiBox = document.getElementById('ascii-stream');
+        // Подключаемся к текстовому потоку Flask
+        const eventSource = new EventSource('/ascii_feed');
+        
+        eventSource.onmessage = function(event) {
+            // Декодируем переносы строк и обновляем экран
+            asciiBox.textContent = event.data.replaceAll('\\n', '\n');
+        };
+    </script>
+</body>
+</html>
