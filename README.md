@@ -9,7 +9,7 @@ The project renders falling code streams onto a graphical canvas using OpenCV, l
 ## 📸 Preview
 
 ### Real-time Matrix Effect
-![ASCII Matrix Camera Preview](./preview.jpg)
+![ASCII Matrix Camera Preview](images/preview.jpg)
 *Place your animated GIF or project screenshot here (save your image as `preview.gif` in the repository root).*
 
 ---
