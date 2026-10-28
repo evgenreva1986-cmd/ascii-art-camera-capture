@@ -19,7 +19,8 @@ def generate_ascii():
   while True:
     ret, frame = cap.read()
     if not ret:
-      break
+      # Создаем случайную матрицу (шум), имитирующую кадр
+      frame = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
 
     # 1. Ваша логика: серое изображение и уменьшение размера
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
