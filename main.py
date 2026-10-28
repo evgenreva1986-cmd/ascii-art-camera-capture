@@ -2,6 +2,7 @@ import time
 import cv2
 from flask import Flask, Response, render_template
 import numpy as np
+import os
 
 app = Flask(__name__)
 
@@ -61,4 +62,9 @@ def ascii_feed():
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000, debug=True)
+  import os
+  
+  port = int(os.environ.get("PORT", 8000))
+
+  app.run(host="0.0.0.0", port=port)
+
