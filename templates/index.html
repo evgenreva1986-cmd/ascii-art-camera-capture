@@ -9,6 +9,7 @@
         /* Тег <pre> сохраняет все пробелы и переносы строк */
         pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
     </style>
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
 <body>
     <h1>Test translation</h1>
@@ -19,29 +20,7 @@
         <input type="color" id="colors" value="#ff0000">
         <span id="colorValue">#ff0000</span>
     </div>
+    <video id="webcam" autoplay playsinline width="640" height="480" style="display: none">тест</video>
 
-    <script>
-        const asciiBox = document.getElementById('ascii-stream');
-        // Подключаемся к текстовому потоку Flask
-        const eventSource = new EventSource('/ascii_feed');
-        
-        eventSource.onmessage = function(event) 
-        {
-            // Декодируем переносы строк и обновляем экран
-            asciiBox.textContent = event.data.replaceAll('\\n', '\n');
-        }; // Закрыли функцию onmessage
-
-        // Вынесли работу с цветом наружу, чтобы не вешать событие заново при каждом сообщении
-        const colorInput = document.getElementById('colors'); // Исправили id на 'colors'
-        const colorValue = document.getElementById('colorValue');
-
-        colorInput.addEventListener('input', (event) => 
-        {
-            const chosenColor = event.target.value;
-            colorValue.textContent = chosenColor;
-            
-            document.body.style.color = chosenColor;
-        }); // ТУТ была главная синтаксическая ошибка (не хватало });)
-    </script>
 </body>
 </html>
