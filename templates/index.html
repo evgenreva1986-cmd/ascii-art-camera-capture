@@ -8,8 +8,9 @@
         body { background-color: #000; color: red; font-family: monospace; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
     </style>
-    <!-- Подключаем библиотеку Socket.IO для фронтенда -->
-    <script src="https://cloudflare.com"></script>
+    
+    <!-- ИСПРАВЛЕНО: Подключаем Socket.IO строго в теге head БЕЗ defer, чтобы он гарантированно загрузился первым -->
+    <script src="https://socket.io"></script>
 </head>
 <body>
     <h1>Test translation</h1>
@@ -23,53 +24,55 @@
     <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
 
     <script>
-        const asciiBox = document.getElementById('ascii-stream');
-        const colorInput = document.getElementById('colors');
-        const colorValue = document.getElementById('colorValue');
+        // ИСПРАВЛЕНО: Оборачиваем весь код в проверку загрузки страницы, чтобы дождаться библиотеки io
+        window.addEventListener('DOMContentLoaded', () => {
+            const asciiBox = document.getElementById('ascii-stream');
+            const colorInput = document.getElementById('colors');
+            const colorValue = document.getElementById('colorValue');
 
-        // 1. Управляем цветом текста
-        colorInput.addEventListener('input', (event) => {
-            const chosenColor = event.target.value;
-            colorValue.textContent = chosenColor;
-            document.body.style.color = chosenColor;
-        });
-
-        // 2. Инициализируем соединение веб-сокетов
-        const socket = io();
-
-        // Слушаем ответ от сервера с готовым ASCII кодом
-        socket.on('ascii_response', function(data) {
-            asciiBox.textContent = data.ascii;
-        });
-
-        // 3. Работа с веб-камерой
-        const camera = document.getElementById("webcam");
-        const canvas = document.createElement('canvas');
-        canvas.width = 320;  
-        canvas.height = 240;
-        const context = canvas.getContext('2d');
-
-        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then((stream) => {
-                camera.srcObject = stream;
-                camera.onloadedmetadata = () => {
-                    // Каждые 70мс отправляем свежий кадр по сокету
-                    setInterval(sendFrame, 70); 
-                };
-            })
-            .catch((error) => {
-                console.error("Ошибка камеры:", error);
-                asciiBox.textContent = "Ошибка: Доступ к камере заблокирован.";
+            // Управляем цветом текста
+            colorInput.addEventListener('input', (event) => {
+                const chosenColor = event.target.value;
+                colorValue.textContent = chosenColor;
+                document.body.style.color = chosenColor;
             });
 
-        function sendFrame() {
-            if (camera.paused || camera.ended) return;
-            context.drawImage(camera, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.4); // Сжатие до 40% для супер-скорости
-            
-            //Отправляем напрямую в сокет-событие без HTTP запросов
-            socket.emit('video_frame', dataUrl);
-        }
+            // Инициализируем соединение веб-сокетов (теперь io точно определен)
+            const socket = io();
+
+            // Слушаем ответ от сервера с готовым ASCII кодом
+            socket.on('ascii_response', function(data) {
+                asciiBox.textContent = data.ascii;
+            });
+
+            // Работа с веб-камерой
+            const camera = document.getElementById("webcam");
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;  
+            canvas.height = 240;
+            const context = canvas.getContext('2d');
+
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                .then((stream) => {
+                    camera.srcObject = stream;
+                    camera.onloadedmetadata = () => {
+                        // Каждые 70мс отправляем свежий кадр по сокету
+                        setInterval(sendFrame, 70); 
+                    };
+                })
+                .catch((error) => {
+                    console.error("Ошибка камеры:", error);
+                    asciiBox.textContent = "Ошибка: Доступ к камере заблокирован. Убедитесь, что сайт открыт по HTTPS.";
+                });
+
+            function sendFrame() {
+                if (camera.paused || camera.ended) return;
+                context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.4); // Сжатие для скорости
+                
+                socket.emit('video_frame', dataUrl);
+            }
+        });
     </script>
 </body>
 </html>
