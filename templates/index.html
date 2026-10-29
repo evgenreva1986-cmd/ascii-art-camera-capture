@@ -23,9 +23,18 @@
     
     <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
 
-    <script>
-        // ИСПРАВЛЕНО: Оборачиваем весь код в проверку загрузки страницы, чтобы дождаться библиотеки io
-        window.addEventListener('DOMContentLoaded', () => {
+     <script>
+        // Функция, которая будет ждать полной загрузки библиотеки Socket.IO
+        function initApp() {
+            // Если библиотека еще не загрузилась, ждем 100 миллисекунд и проверяем снова
+            if (typeof io === 'undefined') {
+                setTimeout(initApp, 100);
+                return;
+            }
+
+            // КАК ТОЛЬКО ИНТЕРНЕТ ПОДГРУЗИЛ 'io' — ЗАПУСКАЕМ ВЕСЬ НАШ КОД:
+            console.log("Socket.IO успешно загружен! Запуск трансляции...");
+            
             const asciiBox = document.getElementById('ascii-stream');
             const colorInput = document.getElementById('colors');
             const colorValue = document.getElementById('colorValue');
@@ -37,10 +46,10 @@
                 document.body.style.color = chosenColor;
             });
 
-            // Инициализируем соединение веб-сокетов (теперь io точно определен)
+            // Инициализируем сокеты
             const socket = io();
 
-            // Слушаем ответ от сервера с готовым ASCII кодом
+            // Принимаем ASCII-арт
             socket.on('ascii_response', function(data) {
                 asciiBox.textContent = data.ascii;
             });
@@ -56,23 +65,25 @@
                 .then((stream) => {
                     camera.srcObject = stream;
                     camera.onloadedmetadata = () => {
-                        // Каждые 70мс отправляем свежий кадр по сокету
                         setInterval(sendFrame, 70); 
                     };
                 })
                 .catch((error) => {
                     console.error("Ошибка камеры:", error);
-                    asciiBox.textContent = "Ошибка: Доступ к камере заблокирован. Убедитесь, что сайт открыт по HTTPS.";
+                    asciiBox.textContent = "Ошибка: Доступ к камере заблокирован.";
                 });
 
             function sendFrame() {
                 if (camera.paused || camera.ended) return;
                 context.drawImage(camera, 0, 0, canvas.width, canvas.height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.4); // Сжатие для скорости
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
                 
                 socket.emit('video_frame', dataUrl);
             }
-        });
+        }
+
+        // Запускаем нашу проверку сразу при открытии страницы
+        window.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
