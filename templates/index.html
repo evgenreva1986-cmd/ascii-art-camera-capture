@@ -3,83 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test</title>
+    <title>ASCII Camera Capture</title>
     <style>
         body { background-color: #000; color: red; font-family: monospace; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        /* Тег <pre> сохраняет все пробелы и переносы строк */
         pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
     </style>
+    <!-- Подключаем библиотеку Socket.IO для фронтенда -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
     <h1>Test translation</h1>
-    <pre id="ascii-stream">Загрузка ASCII потока...</pre>
+    <pre id="ascii-stream">Подключение к сокету сервера...</pre>
     
-    <!-- Добавили тег span для вывода кода цвета -->
     <div>
         <input type="color" id="colors" value="#ff0000">
         <span id="colorValue">#ff0000</span>
     </div>
-    <video id="webcam" autoplay playsinline width="640" height="480" style="display: none">тест</video>
+    
+    <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
+
     <script>
         const asciiBox = document.getElementById('ascii-stream');
-// Подключаемся к текстовому потоку Flask (SSE)
-const eventSource = new EventSource('/ascii_feed');
+        const colorInput = document.getElementById('colors');
+        const colorValue = document.getElementById('colorValue');
 
-eventSource.onmessage = function(event) {
-    // Декодируем переносы строк и обновляем экран
-    asciiBox.textContent = event.data.replaceAll('\\n', '\n');
-};
+        // 1. Управляем цветом текста
+        colorInput.addEventListener('input', (event) => {
+            const chosenColor = event.target.value;
+            colorValue.textContent = chosenColor;
+            document.body.style.color = chosenColor;
+        });
 
-// Работа с цветом
-const colorInput = document.getElementById('colors');
-const colorValue = document.getElementById('colorValue');
+        // 2. Инициализируем соединение веб-сокетов
+        const socket = io();
 
-colorInput.addEventListener('input', (event) => {
-    const chosenColor = event.target.value;
-    colorValue.textContent = chosenColor;
-    document.body.style.color = chosenColor;
-});
+        // Слушаем ответ от сервера с готовым ASCII кодом
+        socket.on('ascii_response', function(data) {
+            asciiBox.textContent = data.ascii;
+        });
 
-// РАБОТА С КАМЕРОЙ И ОТПРАВКОЙ НА СЕРВЕР
-const camera = document.getElementById("webcam");
+        // 3. Работа с веб-камерой
+        const camera = document.getElementById("webcam");
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;  
+        canvas.height = 240;
+        const context = canvas.getContext('2d');
 
-// Создаем виртуальный canvas в памяти (на экран его выводить не нужно)
-const canvas = document.createElement('canvas');
-canvas.width = 320;  // Оптимальный размер для быстрой отправки
-canvas.height = 240;
-const context = canvas.getContext('2d');
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then((stream) => {
+                camera.srcObject = stream;
+                camera.onloadedmetadata = () => {
+                    // Каждые 70мс отправляем свежий кадр по сокету
+                    setInterval(sendFrame, 70); 
+                };
+            })
+            .catch((error) => {
+                console.error("Ошибка камеры:", error);
+                asciiBox.textContent = "Ошибка: Доступ к камере заблокирован.";
+            });
 
-navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    .then((stream) => {
-        // Передаем поток из камеры в тег <video>
-        camera.srcObject = stream;
-        
-        // Как только видео начнет воспроизводиться, запускаем отправку кадров
-        camera.onloadedmetadata = () => {
-            setInterval(sendFrameToServer, 100); // 10 кадров в секунду (можно 60, но 100мс стабильнее)
-        };
-    })
-    .catch((error) => {
-        console.error("Ошибка доступа к камере:", error);
-        alert("Не удалось получить доступ к камере.");
-    });
-
-function sendFrameToServer() {
-    if (camera.paused || camera.ended) return;
-    
-    // Рисуем текущий кадр из видео на скрытый canvas
-    context.drawImage(camera, 0, 0, canvas.width, canvas.height);
-    
-    // Превращаем в JPEG с небольшим сжатием (0.5), чтобы летело моментально
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-    
-    // Отправляем POST-запрос на Flask
-    fetch('/upload_frame', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: dataUrl })
-    }).catch(err => console.error("Ошибка отправки кадра:", err));
-}
+        function sendFrame() {
+            if (camera.paused || camera.ended) return;
+            context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.4); // Сжатие до 40% для супер-скорости
+            
+            //Отправляем напрямую в сокет-событие без HTTP запросов
+            socket.emit('video_frame', dataUrl);
+        }
     </script>
 </body>
 </html>
