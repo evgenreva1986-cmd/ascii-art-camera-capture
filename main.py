@@ -1,16 +1,20 @@
 import base64
+import time
 import cv2
-from flask import Flask, render_template
+from flask import Flask, Response, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 import numpy as np
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_matrix_key'
-# Разрешаем сокеты для любых адресов
+# Инициализируем сокеты и разрешаем CORS для работы на хостингах
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Символы от темного к светлому 
 ASCII_CHARS = " .,:;i-+*h%@#W漢字"
 num_chars = len(ASCII_CHARS)
+
+# Размеры сетки вывода
 cols, rows = 110, 70
 
 @app.route("/")
@@ -21,20 +25,24 @@ def index():
 @socketio.on('video_frame')
 def handle_video_frame(data):
     try:
-        # 1. Декодируем Base64 строку в картинку OpenCV
+        # Извлекаем чистую строку Base64, отрезая техническую шапку
         encoded_data = data.split(',')[1]
+        
+        # Декодируем байты в картинку OpenCV
         nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         if frame is None:
             return
 
-        # 2. Зеркалим кадр
+        # Зеркалим кадр по горизонтали для удобства пользователя
         frame = cv2.flip(frame, 1)
 
-        # 3. Наша ASCII-логика обработки
+        # Конвертируем в серое изображение и уменьшаем размер до нашей сетки
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         small = cv2.resize(gray, (cols, rows))
+
+        # Масштабируем яркость пикселей в индексы нашей строки символов
         animated_indices = (small / 255.0 * (num_chars - 1)).astype(int)
 
         ascii_lines = []
@@ -42,9 +50,10 @@ def handle_video_frame(data):
             line = "".join([ASCII_CHARS[pixel] for pixel in row])
             ascii_lines.append(line)
 
+        # Собираем финальную текстовую картинку
         ascii_frame = "\n".join(ascii_lines)
 
-        # 4. МГНОВЕННО отправляем ASCII-кадр обратно тому же пользователю
+        # Мгновенно отправляем ASCII-арт обратно клиенту по тому же сокет-каналу
         emit('ascii_response', {'ascii': ascii_frame})
 
     except Exception as e:
@@ -53,5 +62,5 @@ def handle_video_frame(data):
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
-    # Для сокетов важно запускаться через socketio.run
+    # Разрешаем запуск unsafe werkzeug, чтобы обойти защиту Flask на хостингах
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)

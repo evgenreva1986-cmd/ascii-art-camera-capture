@@ -3,61 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASCII Camera Capture</title>
+    <title>ASCII Matrix Camera Capture</title>
     <style>
-        body { background-color: #000; color: red; font-family: monospace; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; }
+        body { background-color: #000; color: red; font-family: monospace; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; user-select: none; }
+        /* Тег pre сохраняет все пробелы и переносы, формируя текстовую картинку */
+        pre { font-size: 8px; line-height: 7px; letter-spacing: 2px; font-weight: bold; text-align: center; }
+        div { margin-top: 15px; display: flex; align-items: center; gap: 10px; }
     </style>
     
-    <!-- ИСПРАВЛЕНО: Подключаем Socket.IO строго в теге head БЕЗ defer, чтобы он гарантированно загрузился первым -->
-    <script src="https://socket.io"></script>
+    <!-- Подключаем Socket.IO прямо с твоего собственного сервера, чтобы хостинг его не заблокировал -->
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <h1>Test translation</h1>
-    <pre id="ascii-stream">Подключение к сокету сервера...</pre>
+    <h1>ASCII Matrix Stream</h1>
+    <pre id="ascii-stream">Загрузка ASCII потока через сокеты...</pre>
     
     <div>
         <input type="color" id="colors" value="#ff0000">
         <span id="colorValue">#ff0000</span>
     </div>
     
+    <!-- Скрываем оригинальное цветное видео, оставляя только ASCII-эффект -->
     <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
 
-     <script>
-        // Функция, которая будет ждать полной загрузки библиотеки Socket.IO
-        function initApp() {
-            // Если библиотека еще не загрузилась, ждем 100 миллисекунд и проверяем снова
-            if (typeof io === 'undefined') {
-                setTimeout(initApp, 100);
-                return;
-            }
-
-            // КАК ТОЛЬКО ИНТЕРНЕТ ПОДГРУЗИЛ 'io' — ЗАПУСКАЕМ ВЕСЬ НАШ КОД:
-            console.log("Socket.IO успешно загружен! Запуск трансляции...");
-            
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
             const asciiBox = document.getElementById('ascii-stream');
             const colorInput = document.getElementById('colors');
             const colorValue = document.getElementById('colorValue');
 
-            // Управляем цветом текста
+            // Управление цветом текста (интерфейс "Матрицы")
             colorInput.addEventListener('input', (event) => {
                 const chosenColor = event.target.value;
                 colorValue.textContent = chosenColor;
                 document.body.style.color = chosenColor;
             });
 
-            // Инициализируем сокеты
+            // Подключаемся к веб-сокету (io подтянется из локального скрипта выше)
             const socket = io();
 
-            // Принимаем ASCII-арт
+            // Ловим готовый текстовый кадр от Flask и выводим на экран
             socket.on('ascii_response', function(data) {
                 asciiBox.textContent = data.ascii;
             });
 
-            // Работа с веб-камерой
+            // Инициализация захвата веб-камеры
             const camera = document.getElementById("webcam");
             const canvas = document.createElement('canvas');
-            canvas.width = 320;  
+            canvas.width = 320;  // Оптимальное разрешение для моментальной отправки по сети
             canvas.height = 240;
             const context = canvas.getContext('2d');
 
@@ -65,25 +58,28 @@
                 .then((stream) => {
                     camera.srcObject = stream;
                     camera.onloadedmetadata = () => {
+                        // Каждые 70 миллисекунд «нарезаем» видео на кадр и шлем серверу
                         setInterval(sendFrame, 70); 
                     };
                 })
                 .catch((error) => {
                     console.error("Ошибка камеры:", error);
-                    asciiBox.textContent = "Ошибка: Доступ к камере заблокирован.";
+                    asciiBox.textContent = "Ошибка: Доступ к камере заблокирован. Убедитесь, что сайт открыт по HTTPS протоколу!";
                 });
 
             function sendFrame() {
                 if (camera.paused || camera.ended) return;
+                
+                // Рисуем текущий кадр из скрытого видеоплеера на невидимый canvas
                 context.drawImage(camera, 0, 0, canvas.width, canvas.height);
+                
+                // Кодируем в формат JPEG с качеством 40%, чтобы данные летели без задержек
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
                 
+                // Пушим строку кадра прямо в сокет
                 socket.emit('video_frame', dataUrl);
             }
-        }
-
-        // Запускаем нашу проверку сразу при открытии страницы
-        window.addEventListener('DOMContentLoaded', initApp);
+        });
     </script>
 </body>
 </html>
